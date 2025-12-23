@@ -18,6 +18,13 @@ try:
 except Exception:
     option_menu = None
 
+import base64
+
+def img_to_base64(img_path: str) -> str:
+    p = Path(img_path)
+    return base64.b64encode(p.read_bytes()).decode("utf-8")
+
+
 # =========================================================
 # WAJIB PALING ATAS (set_page_config harus sebelum st.* lain)
 # =========================================================
@@ -57,12 +64,36 @@ section[data-testid="stSidebar"] > div { padding-top: 1rem; padding-left: 1rem; 
 
 LOGIN_TOKEN = "3359ab54dece32"  # token/password untuk login
 
-LOGIN_CSS = """
+LOGIN_CSS_TMPL = """
 <style>
+/* Logo fixed di pojok kiri atas */
+.login-logo {
+  position: fixed;
+  top: 180px;
+  left: 16px;
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+}
+
+.login-logo img {
+  height: 34px;      /* atur ukuran logo */
+  width: auto;
+  display: block;
+}
+
+.login-logo .txt {
+  color: rgba(255,255,255,.92);
+  font-weight: 900;
+  font-size: 13px;
+  line-height: 1;
+}
+
 /* Hide sidebar only on login */
 section[data-testid="stSidebar"] { display: none; }
 
-/* Batasi lebar halaman (ini yang bikin form tidak besar) */
+/* Batasi lebar halaman */
 div.block-container {
   max-width: 720px !important;
   padding-top: 2.2rem !important;
@@ -70,33 +101,37 @@ div.block-container {
   margin: 0 auto !important;
 }
 
-/* Background */
-[data-testid="stAppViewContainer"] {
-  background: radial-gradient(1200px 600px at 15% 10%, rgba(255, 200, 120, 0.35), transparent 60%),
-              radial-gradient(900px 500px at 85% 20%, rgba(120, 200, 255, 0.25), transparent 55%),
-              linear-gradient(135deg, #0b1220 0%, #111827 45%, #0f172a 100%);
+/* Background image + overlay gelap */
+html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
+  height: 100% !important;
 }
 
-/* Header card */
+[data-testid="stAppViewContainer"], .stApp, [data-testid="stApp"] {
+  background:
+    linear-gradient(135deg, rgba(0,0,0,.62) 0%, rgba(0,0,0,.55) 50%, rgba(0,0,0,.62) 100%),
+    url("data:image/jpeg;base64,__BG__") !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+}
+
+/* Biar main container transparan (nggak nutup background) */
+[data-testid="stAppViewContainer"] > .main,
+[data-testid="stAppViewContainer"] > section,
+section.main {
+  background: transparent !important;
+}
+
+/* Hero */
 .hero {
-  border: 1px solid rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.18);
   border-radius: 16px;
   padding: 14px;
-  background: rgba(255,255,255,.06);
+  background: rgba(255,255,255,.10);
   backdrop-filter: blur(10px);
   margin-bottom: 12px;
 }
 
-/* Form card */
-.login-card {
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 16px;
-  padding: 14px;
-  background: rgba(255,255,255,.06);
-  backdrop-filter: blur(10px);
-}
-
-/* Badge */
 .badge {
   width: 40px; height: 40px;
   border-radius: 12px;
@@ -108,27 +143,34 @@ div.block-container {
   box-shadow: 0 10px 22px rgba(0,0,0,.35);
 }
 
-/* Title */
 .brand-title { font-size: 20px; font-weight: 900; color: rgba(255,255,255,.95); margin: 0; }
-.brand-sub   { font-size: 12px; color: rgba(255,255,255,.7); margin: 2px 0 0 0; }
+.brand-sub   { font-size: 12px; color: rgba(255,255,255,.8); margin: 2px 0 0 0; }
 
-/* Label & input (dark) */
+/* Form jadi card putih solid */
+div[data-testid="stForm"] {
+  background: rgba(255,255,255,.92) !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+  border: 1px solid rgba(0,0,0,.10) !important;
+  box-shadow: 0 14px 32px rgba(0,0,0,.25) !important;
+}
+
+/* Label hitam */
 div[data-testid="stTextInput"] label,
 div[data-testid="stTextInput"] label p,
 div[data-testid="stTextInput"] label span {
-  color: rgba(255,255,255,.88) !important;
-  font-weight: 700 !important;
+  color: #111827 !important;
+  font-weight: 800 !important;
 }
 
-/* HANYA teks yang diketik di dalam input jadi hitam */
+/* Input putih + teks hitam */
 div[data-testid="stTextInput"] input {
-  background: rgba(255,255,255,.92) !important;  /* biar cocok kalau teks hitam */
-  color: #000000 !important;                     /* teks input hitam */
+  background: #ffffff !important;
+  color: #000000 !important;
   border: 1px solid rgba(0,0,0,.15) !important;
   border-radius: 12px !important;
 }
 
-/* Placeholder (teks contoh di dalam input) juga hitam tipis */
 div[data-testid="stTextInput"] input::placeholder {
   color: rgba(0,0,0,.45) !important;
 }
@@ -141,10 +183,11 @@ div[data-testid="stTextInput"] input::placeholder {
   background: linear-gradient(135deg, rgba(245,158,11,.95), rgba(59,130,246,.95)) !important;
   color: white !important;
   border: 0 !important;
-  padding: 0.55rem 0.8rem !important;    /* lebih kecil */
+  padding: 0.55rem 0.8rem !important;
 }
 </style>
 """
+
 
 
 # =========================================================
@@ -557,8 +600,22 @@ if "last_product" not in st.session_state:
 LOGIN_TOKEN = "3359ab54dece32"
 
 def login_page():
-    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+     # ambil gambar background dari assets
+    bg_path = str((BASE_DIR / "assets" / "coffee_bg.jpg"))
+    bg64 = img_to_base64(bg_path)
 
+    st.markdown(LOGIN_CSS_TMPL.replace("__BG__", bg64), unsafe_allow_html=True)
+        # ===== Logo (pojok kiri atas) =====
+    logo_path = str((BASE_DIR / "assets" / "logo.png"))  # ganti sesuai nama file logo kamu
+    logo64 = img_to_base64(logo_path)
+
+    st.markdown(f"""
+      <div class="login-logo">
+        <img src="data:image/png;base64,{logo64}" alt="logo" style="width:460px ;height:380px">
+      </div>
+    """, unsafe_allow_html=True)
+
+    
     st.markdown("""
       <div class="hero">
         <div style="display:flex; align-items:center; gap:12px;">
