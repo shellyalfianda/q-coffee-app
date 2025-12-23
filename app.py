@@ -75,12 +75,40 @@ LOGIN_CSS_TMPL = """
 
   display: flex;
   align-items: center;
+  gap: 10px;
+
+  padding: 8px 10px;
+  border-radius: 14px;
+
+
+
+  /* animasi halus */
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+  box-shadow: 0 10px 22px rgba(0,0,0,.25);
+}
+
+.login-logo:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 18px 38px rgba(0,0,0,.45);
+  background: rgba(0,0,0,.32);
+  cursor: pointer;
+}
+
+.login-logo:active {
+  transform: translateY(0px) scale(0.99);
+  box-shadow: 0 10px 22px rgba(0,0,0,.30);
 }
 
 .login-logo img {
-  height: 34px;      /* atur ukuran logo */
+  height: 34px;
   width: auto;
   display: block;
+  transition: transform .18s ease, filter .18s ease;
+}
+
+.login-logo:hover img {
+  transform: scale(1.02);
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.35));
 }
 
 .login-logo .txt {
@@ -89,6 +117,7 @@ LOGIN_CSS_TMPL = """
   font-size: 13px;
   line-height: 1;
 }
+
 
 /* Hide sidebar only on login */
 section[data-testid="stSidebar"] { display: none; }
@@ -824,9 +853,27 @@ def page_material():
             stock_comparison = compare_with_stock(ingredient_needs, df_stock)
 
             st.subheader("Kebutuhan vs Stok (Top 20 kekurangan terbesar)")
-            cols = ["NAMA BAHAN","satuan","total_kebutuhan","Total Stok Ml/Gr","kekurangan"]
-            t = stock_comparison[cols].copy().sort_values("kekurangan", ascending=False)
-            st.dataframe(t.head(20), hide_index=True, width="stretch")
+
+            view1 = (stock_comparison[["NAMA BAHAN","satuan","total_kebutuhan","Total Stok Ml/Gr","kekurangan"]]
+                    .copy()
+                    .sort_values("kekurangan", ascending=False)
+                    .head(20))
+
+            view1 = view1.rename(columns={
+                "NAMA BAHAN": "Nama Bahan",
+                "satuan": "Satuan",
+                "total_kebutuhan": "Total Kebutuhan",
+                "Total Stok Ml/Gr": "Stok Saat Ini",
+                "kekurangan": "Kekurangan"
+            })
+
+            # opsional: rapikan angka
+            num_cols = ["Total Kebutuhan", "Stok Saat Ini", "Kekurangan"]
+            for c in num_cols:
+                view1[c] = view1[c].round(2)
+
+            st.dataframe(view1, hide_index=True, width="stretch")
+
 
             df_gwo = prepare_gwo_data(stock_comparison, df_stock)
             dim = len(df_gwo)
@@ -856,10 +903,39 @@ def page_material():
         st.pyplot(fig_gwo)
 
         st.subheader("Tabel Solusi (Top 20 biaya terbesar)")
-        cols2 = ["NAMA BAHAN","total_kebutuhan","Total Stok Ml/Gr","packs_to_buy","order_mlgr_rounded",
-                 "stok_akhir","shortage_setelah_order","overstock_setelah_order","Harga","total_biaya_pembelian"]
-        t2 = solution[cols2].copy().sort_values("total_biaya_pembelian", ascending=False)
-        st.dataframe(t2.head(20), hide_index=True, width="stretch")
+
+        view2 = (solution[[
+            "NAMA BAHAN","total_kebutuhan","Total Stok Ml/Gr",
+            "packs_to_buy","order_mlgr_rounded","stok_akhir",
+            "shortage_setelah_order","overstock_setelah_order",
+            "Harga","total_biaya_pembelian"
+        ]]
+        .copy()
+        .sort_values("total_biaya_pembelian", ascending=False)
+        .head(20))
+
+        view2 = view2.rename(columns={
+            "NAMA BAHAN": "Nama Bahan",
+            "total_kebutuhan": "Kebutuhan",
+            "Total Stok Ml/Gr": "Stok Awal",
+            "packs_to_buy": "Pack Dibeli",
+            "order_mlgr_rounded": "Order (dibulatkan)",
+            "stok_akhir": "Stok Akhir",
+            "shortage_setelah_order": "Shortage",
+            "overstock_setelah_order": "Overstock",
+            "Harga": "Harga/Pack",
+            "total_biaya_pembelian": "Total Biaya"
+        })
+
+        # opsional: rapikan angka
+        for c in ["Kebutuhan","Stok Awal","Order (dibulatkan)","Stok Akhir","Shortage","Overstock"]:
+            view2[c] = view2[c].round(2)
+
+        view2["Harga/Pack"] = view2["Harga/Pack"].round(0)
+        view2["Total Biaya"] = view2["Total Biaya"].round(0)
+
+        st.dataframe(view2, hide_index=True, width="stretch")
+
 
         st.subheader("Total biaya pembelian")
         st.write(f"Rp {solution['total_biaya_pembelian'].sum():,.0f}".replace(",", "."))
