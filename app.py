@@ -69,7 +69,7 @@ LOGIN_CSS_TMPL = """
 /* Logo fixed di pojok kiri atas */
 .login-logo {
   position: fixed;
-  top: 180px;
+  top: 41%;
   left: 16px;
   z-index: 9999;
 
@@ -640,7 +640,7 @@ def login_page():
 
     st.markdown(f"""
       <div class="login-logo">
-        <img src="data:image/png;base64,{logo64}" alt="logo" style="width:460px ;height:380px">
+        <img src="data:image/png;base64,{logo64}" alt="logo" style="width:280px;height:260px">
       </div>
     """, unsafe_allow_html=True)
 
