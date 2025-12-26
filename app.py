@@ -63,6 +63,123 @@ section[data-testid="stSidebar"] > div { padding-top: 1rem; padding-left: 1rem; 
 """, unsafe_allow_html=True)
 
 LOGIN_TOKEN = "3359ab54dece32"  # token/password untuk login
+TABLE_BG = "#D1CABD"
+
+TABLE_CSS = f"""
+<style>
+/* =========================
+   st.dataframe (Glide Data Grid)
+   ========================= */
+div[data-testid="stDataFrame"],
+div[data-testid="stDataFrame"] * {{
+  /* warna dasar tabel */
+  --gdg-bg-cell: {TABLE_BG};
+  --gdg-bg-cell-medium: {TABLE_BG};
+  --gdg-bg-cell-light: {TABLE_BG};
+
+  /* header sedikit lebih gelap biar rapi */
+  --gdg-bg-header: rgba(0,0,0,.06);
+  --gdg-bg-header-hover: rgba(0,0,0,.10);
+
+  /* garis & teks */
+  --gdg-border-color: rgba(0,0,0,.12);
+  --gdg-text-dark: #111827;
+  --gdg-text-medium: rgba(17,24,39,.85);
+}}
+
+div[data-testid="stDataFrame"] {{
+  background: {TABLE_BG} !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(0,0,0,.10) !important;
+  overflow: hidden !important;
+}}
+
+/* bagian editor/grid */
+div[data-testid="stDataFrame"] .glideDataEditor {{
+  background: {TABLE_BG} !important;
+}}
+
+/* =========================
+   st.table (HTML table)
+   ========================= */
+div[data-testid="stTable"] table {{
+  background: {TABLE_BG} !important;
+  border-collapse: collapse !important;
+  width: 100% !important;
+}}
+div[data-testid="stTable"] thead tr {{
+  background: rgba(0,0,0,.06) !important;
+}}
+div[data-testid="stTable"] th,
+div[data-testid="stTable"] td {{
+  background: transparent !important;
+  color: #111827 !important;
+  border-bottom: 1px solid rgba(0,0,0,.10) !important;
+}}
+</style>
+"""
+
+
+
+APP_BG = "#D1CABD"
+SIDEBAR_BG = "#7C7056"
+
+APP_THEME_CSS = f"""
+<style>
+/* ===== Background utama setelah login ===== */
+html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stApp"] {{
+  background: {APP_BG} !important;
+}}
+
+/* Kadang Streamlit menaruh background di main container */
+[data-testid="stAppViewContainer"] > .main,
+[data-testid="stAppViewContainer"] > section,
+section.main {{
+  background: transparent !important;
+}}
+
+/* ===== Sidebar background setelah login ===== */
+section[data-testid="stSidebar"] > div {{
+  background: {SIDEBAR_BG} !important;
+  width: 18rem !important;
+}}
+
+/* Warna teks sidebar biar kebaca */
+section[data-testid="stSidebar"] * {{
+  color: rgba(255,255,255,.92) !important;
+}}
+
+/* Card di sidebar (kalau masih mau card putih, biar kontras) */
+section[data-testid="stSidebar"] .card {{
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+}}
+
+/* Tombol sidebar biar enak dilihat */
+section[data-testid="stSidebar"] .stButton > button {{
+  background: rgba(255,255,255,.16) !important;
+  border: 1px solid rgba(255,255,255,.20) !important;
+  color: rgba(255,255,255,.95) !important;
+}}
+/* Paksa option_menu tidak putih */
+section[data-testid="stSidebar"] .nav,
+section[data-testid="stSidebar"] ul {{
+  background: transparent !important;
+}}
+
+section[data-testid="stSidebar"] a.nav-link {{
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  color: rgba(255,255,255,.92) !important;
+}}
+
+section[data-testid="stSidebar"] a.nav-link.active {{
+  background: rgba(255,255,255,.22) !important;
+  border: 1px solid rgba(255,255,255,.28) !important;
+  color: rgba(255,255,255,.98) !important;
+}}
+</style>
+"""
 
 LOGIN_CSS_TMPL = """
 <style>
@@ -690,7 +807,6 @@ def sidebar_menu():
           /* Sidebar background jadi abu-abu */
           section[data-testid="stSidebar"] > div {
             width: 18rem !important;
-            background: #f3f4f6 !important;  /* abu-abu muda */
           }
 
           /* Opsional: rapikan padding sidebar */
@@ -722,11 +838,32 @@ def sidebar_menu():
                 icons=["graph-up-arrow", "boxes", "book", "clipboard-data"],
                 default_index=0,
                 styles={
-                    "container": {"padding": "0!important"},
-                    "icon": {"font-size": "16px"},
-                    "nav-link": {"font-size": "14px", "border-radius": "10px", "margin": "4px 0"},
-                    "nav-link-selected": {"font-weight": "900"},
+                    "container": {
+                        "padding": "0!important",
+                        "background-color": "#7C7056",
+                        "border-radius": "12px",
+                    },
+                    "icon": {
+                        "font-size": "16px",
+                        "color": "rgba(255,255,255,.92)",
+                    },
+                    "nav-link": {
+                        "font-size": "14px",
+                        "border-radius": "10px",
+                        "margin": "6px 0",
+                        "color": "rgba(255,255,255,.92)",
+                        "background-color": "rgba(255,255,255,.12)",
+                        "border": "1px solid rgba(255,255,255,.18)",
+                    },
+                    "nav-link-selected": {
+                        "font-weight": "900",
+                        "color": "rgba(255,255,255,.98)",
+                        "background-color": "rgba(255,255,255,.22)",
+                        "border": "1px solid rgba(255,255,255,.28)",
+                        "box-shadow": "0 10px 22px rgba(0,0,0,.25)",
+                    },
                 }
+
             )
         else:
             selected = st.radio("Menu", ["Prediksi Penjualan", "Optimasi Bahan Baku", "Resep", "Hasil Implementasi"])
@@ -1009,6 +1146,8 @@ except Exception as e:
 if not st.session_state.logged_in:
     login_page()
 else:
+    st.markdown(APP_THEME_CSS, unsafe_allow_html=True)
+    st.markdown(TABLE_CSS, unsafe_allow_html=True)
     page = sidebar_menu()
     if page == "Prediksi Penjualan":
         page_sales()
