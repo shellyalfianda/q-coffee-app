@@ -822,9 +822,9 @@ def sidebar_menu():
 
         st.markdown(f"""
           <div class="card">
-            <h4>Profil</h4>
+            <h4>Profile</h4>
             <div class="kv">
-              <div class="k">Nama</div><div class="v">{p.get('nama','-')}</div>
+              <div class="k">Name</div><div class="v">{p.get('nama','-')}</div>
               <div class="k">No. Telp</div><div class="v">{p.get('no_telp','-')}</div>
             </div>
           </div>
@@ -834,7 +834,7 @@ def sidebar_menu():
         if option_menu:
             selected = option_menu(
                 menu_title=None,
-                options=["Prediksi Penjualan", "Optimasi Bahan Baku", "Resep", "Hasil Implementasi"],
+                options=["Sales Prediction", "Raw Material Optimization", "Recipe", "Result"],
                 icons=["graph-up-arrow", "boxes", "book", "clipboard-data"],
                 default_index=0,
                 styles={
@@ -866,7 +866,7 @@ def sidebar_menu():
 
             )
         else:
-            selected = st.radio("Menu", ["Prediksi Penjualan", "Optimasi Bahan Baku", "Resep", "Hasil Implementasi"])
+            selected = st.radio("Menu", ["Sales Prediction", "Raw Material Optimization", "Recipe", "Result"])
 
         st.markdown("---")
         if st.button("Reload Data (Drive)"):
@@ -886,16 +886,16 @@ def sidebar_menu():
 # PAGES
 # =========================================================
 def page_sales():
-    st.title("Prediksi Penjualan (LSTM)")
+    st.title("Sales Prediction (LSTM)")
     df_sales, _, _, _ = load_all_data()
 
     products = sorted(df_sales["nama produk"].dropna().unique().tolist())
     if not products:
-        st.error("Tidak ada produk terbaca dari data penjualan.")
+        st.error("No products were read from the sales data.")
         return
 
     default_idx = products.index(DEFAULT_PRODUCT) if DEFAULT_PRODUCT in products else 0
-    product = st.selectbox("Pilih produk target", options=products, index=default_idx)
+    product = st.selectbox("Select Target Product", options=products, index=default_idx)
 
     colA, colB, colC = st.columns(3)
     with colA:
@@ -911,9 +911,9 @@ def page_sales():
     topN = 14
     top_products = (df_sales.groupby("nama produk")["jumlah terjual"].sum().astype(int)
                     .sort_values(ascending=False).head(topN))
-    st.subheader(f"Top {topN} produk (cup)")
+    st.subheader(f"Top {topN} Product (cup)")
     top_df = top_products.reset_index().rename(columns={
-    "nama produk": "Produk",
+    "nama produk": "Product",
     "jumlah terjual": "Total (cup)"
 })
     top_df.index = np.arange(1, len(top_df) + 1)  # index mulai dari 1
@@ -937,8 +937,8 @@ def page_sales():
             st.session_state.last_future_int = preds_int
             st.session_state.last_product = product
 
-        st.success("Selesai.")
-        st.subheader("Evaluasi")
+        st.success("Finished.")
+        st.subheader("Evaluation")
         st.json(metrics)
 
         st.subheader("Loss Curve")
@@ -947,24 +947,24 @@ def page_sales():
         st.subheader("Actual vs Predicted")
         st.pyplot(fig_pred)
 
-        st.subheader("Prediksi ke depan (cup integer)")
+        st.subheader("Future Prediction (cup integer)")
         out_df = pd.DataFrame({"Hari":[f"+{i+1}" for i in range(len(preds_int))],
                                "Prediksi (cup)": preds_int})
         out_df.index= np.arange(1, len(out_df) + 1)  # index mulai dari 1
         st.dataframe(out_df, width="stretch")
-        st.line_chart(out_df.set_index("Hari")["Prediksi (cup)"])
+        st.line_chart(out_df.set_index("Day")["Prediction (cup)"])
 
 def page_material():
-    st.title("Optimasi Bahan Baku (Recipe + Stock + GWO)")
+    st.title("Raw Material Optimization (Recipe + Stock + GWO)")
     _, _, df_recipe_long, df_stock = load_all_data()
 
     st.subheader("Demand (cup)")
     if st.session_state.last_future_int is not None:
-        st.write(f"Prediksi terakhir untuk produk: **{st.session_state.last_product}**")
-        use_pred = st.checkbox("Gunakan rata-rata prediksi LSTM", value=True)
+        st.write(f"Latest predictions for the product: **{st.session_state.last_product}**")
+        use_pred = st.checkbox("Use the average of LSTM predictions", value=True)
     else:
         use_pred = False
-        st.warning("Belum ada prediksi LSTM. Jalankan Sales Prediction dulu atau isi demand manual.")
+        st.warning("There are no LSTM predictions yet. Run Sales Prediction first or fill in the demand manually.")
 
     if use_pred and st.session_state.last_future_int is not None:
         product = st.session_state.last_product
@@ -973,11 +973,11 @@ def page_material():
         product = st.text_input("Nama produk", value=DEFAULT_PRODUCT)
         demand_units = int(st.number_input("Demand (cup) integer", min_value=0, value=50))
 
-    st.write("Demand dipakai:", demand_units, "cup")
+    st.write("Demand use:", demand_units, "cup")
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        num_wolves = st.number_input("Jumlah Wolves", 5, 100, 25)
+        num_wolves = st.number_input("Number of Wolves", 5, 100, 25)
     with col2:
         max_iter = st.number_input("Max Iter", 10, 500, 100)
     with col3:
@@ -989,7 +989,7 @@ def page_material():
             ingredient_needs = compute_ingredient_needs(df_recipe_long, product_demand)
             stock_comparison = compare_with_stock(ingredient_needs, df_stock)
 
-            st.subheader("Kebutuhan vs Stok (Top 20 kekurangan terbesar)")
+            st.subheader("Needs vs Stock (Top 20 biggest shortages)")
 
             view1 = (stock_comparison[["NAMA BAHAN","satuan","total_kebutuhan","Total Stok Ml/Gr","kekurangan"]]
                     .copy()
@@ -997,15 +997,15 @@ def page_material():
                     .head(20))
 
             view1 = view1.rename(columns={
-                "NAMA BAHAN": "Nama Bahan",
-                "satuan": "Satuan",
-                "total_kebutuhan": "Total Kebutuhan",
-                "Total Stok Ml/Gr": "Stok Saat Ini",
-                "kekurangan": "Kekurangan"
+                "NAMA BAHAN": "Material Name",
+                "satuan": "Unit",
+                "total_kebutuhan": "Total Needs",
+                "Total Stok Ml/Gr": "Current Stock",
+                "kekurangan": "Lack"
             })
 
             # opsional: rapikan angka
-            num_cols = ["Total Kebutuhan", "Stok Saat Ini", "Kekurangan"]
+            num_cols = ["Total Needs", "Current Stock", "Lack"]
             for c in num_cols:
                 view1[c] = view1[c].round(2)
 
@@ -1034,12 +1034,12 @@ def page_material():
 
             solution = build_solution_table(df_gwo, best_order)
 
-        st.success(f"Selesai. Best Objective: {best_cost:.4f}")
+        st.success(f"Finished. Best Objective: {best_cost:.4f}")
 
-        st.subheader("Grafik Objective Function (GWO)")
+        st.subheader("Objective Function Graph (GWO)")
         st.pyplot(fig_gwo)
 
-        st.subheader("Tabel Solusi (Top 20 biaya terbesar)")
+        st.subheader("Solution Table (Top 20 largest costs)")
 
         view2 = (solution[[
             "NAMA BAHAN","total_kebutuhan","Total Stok Ml/Gr",
@@ -1052,24 +1052,24 @@ def page_material():
         .head(20))
 
         view2 = view2.rename(columns={
-            "NAMA BAHAN": "Nama Bahan",
-            "total_kebutuhan": "Kebutuhan",
-            "Total Stok Ml/Gr": "Stok Awal",
-            "packs_to_buy": "Pack Dibeli",
-            "order_mlgr_rounded": "Order (dibulatkan)",
-            "stok_akhir": "Stok Akhir",
+            "NAMA BAHAN": "Material Name",
+            "total_kebutuhan": "Total Needs",
+            "Total Stok Ml/Gr": "Initial Stock",
+            "packs_to_buy": "Pack Purchased",
+            "order_mlgr_rounded": "Order",
+            "stok_akhir": "Final Stock",
             "shortage_setelah_order": "Shortage",
             "overstock_setelah_order": "Overstock",
-            "Harga": "Harga/Pack",
-            "total_biaya_pembelian": "Total Biaya"
+            "Harga": "Price/Pack",
+            "total_biaya_pembelian": "Total Cost"
         })
 
         # opsional: rapikan angka
-        for c in ["Kebutuhan","Stok Awal","Order (dibulatkan)","Stok Akhir","Shortage","Overstock"]:
+        for c in ["Total Needs","Initial Stock","Order","Final Stock","Shortage","Overstock"]:
             view2[c] = view2[c].round(2)
 
-        view2["Harga/Pack"] = view2["Harga/Pack"].round(0)
-        view2["Total Biaya"] = view2["Total Biaya"].round(0)
+        view2["Price/Pack"] = view2["Price/Pack"].round(0)
+        view2["Total Cost"] = view2["Total Cost"].round(0)
 
         st.dataframe(view2, hide_index=True, width="stretch")
 
@@ -1078,29 +1078,29 @@ def page_material():
         st.write(f"Rp {solution['total_biaya_pembelian'].sum():,.0f}".replace(",", "."))
 
 def page_recipe():
-    st.title("Resep")
+    st.title("Recipe")
     _, df_recipe, df_recipe_long, _ = load_all_data()
 
-    st.subheader("Resep – Contoh 200 baris")
+    st.subheader("Recipe – Example 200 line")
     view_long: pd.DataFrame = df_recipe_long.rename(columns={
-        "gr/ml/pcs": "Satuan",
-        "NAMA BAHAN": "Nama Bahan",
-        "nama produk": "Nama Produk",
+        "gr/ml/pcs": "Unit",
+        "NAMA BAHAN": "Material Name",
+        "nama produk": "Product Name",
         "qty_per_saji" : "Quantity",
     }).reset_index(drop=True)
     view_long.index = view_long.index + 1
     st.dataframe(view_long.head(200), width="stretch")
 
 def page_results():
-    st.title("Hasil Implementasi")
+    st.title("Result")
 
     # --- Tabel Profil ---
     p = st.session_state.profile or {}
     df_profile = pd.DataFrame([
-        {"Field": "Nama", "Value": p.get("nama", "-")},
+        {"Field": "Name", "Value": p.get("nama", "-")},
         {"Field": "No. Telp", "Value": p.get("no_telp", "-")},
     ])
-    st.subheader("Profil")
+    st.subheader("Profile")
     st.dataframe(df_profile, hide_index=True, width="stretch")
 
 
@@ -1121,18 +1121,18 @@ def page_results():
         prod = st.session_state.last_product
 
         df_pred = pd.DataFrame({
-            "Produk": [prod] * len(preds),
-            "Hari": [f"+{i+1}" for i in range(len(preds))],
-            "Prediksi (cup)": preds.astype(int)
+            "Product": [prod] * len(preds),
+            "Day": [f"+{i+1}" for i in range(len(preds))],
+            "Prediction (cup)": preds.astype(int)
         })
 
-        st.subheader("Prediksi Terakhir (cup integer)")
+        st.subheader("Last Prediction (cup integer)")
         st.dataframe(df_pred, hide_index=True, width="stretch")
 
         # Optional: grafik cepat
-        st.line_chart(df_pred.set_index("Hari")["Prediksi (cup)"])
+        st.line_chart(df_pred.set_index("Day")["Prediction (cup)"])
     else:
-        st.info("Belum ada hasil prediksi. Jalankan Sales Prediction dulu.")
+        st.info("There are no prediction results yet. Run Sales Prediction first.")
 
 # =========================================================
 # APP FLOW
@@ -1149,11 +1149,11 @@ else:
     st.markdown(APP_THEME_CSS, unsafe_allow_html=True)
     st.markdown(TABLE_CSS, unsafe_allow_html=True)
     page = sidebar_menu()
-    if page == "Prediksi Penjualan":
+    if page == "Sales Prediction":
         page_sales()
-    elif page == "Optimasi Bahan Baku":
+    elif page == "Raw Material Optimization":
         page_material()
-    elif page == "Resep":
+    elif page == "Recipe":
         page_recipe()
     else:
         page_results()
