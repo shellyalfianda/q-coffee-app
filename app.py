@@ -768,7 +768,7 @@ def login_page():
           <div class="badge">☕</div>
           <div>
             <p class="brand-title">Q Coffee App</p>
-            <p class="brand-sub">Sales Forecasting (LSTM) • Material Optimization (GWO)</p>
+            <p class="brand-sub">Sales Prediction (LSTM) • Raw Material Optimization (GWO)</p>
           </div>
         </div>
       </div>
@@ -777,10 +777,10 @@ def login_page():
     st.markdown("<div class='login-card'><h3 style='margin:0;color:rgba(255,255,255,.92);font-size:15px;font-weight:900;'>Login</h3></div>", unsafe_allow_html=True)
 
     with st.form("login_form", clear_on_submit=False):
-        nama = st.text_input("Nama", placeholder="Contoh: Ahmad")
-        no_telp = st.text_input("No. Telp", placeholder="Contoh: 08xxxxxxxxxx")
-        token = st.text_input("Password / Token", type="password", placeholder="Masukkan token")
-        submitted = st.form_submit_button("Masuk")
+        nama = st.text_input("Name", placeholder="Example: Ahmad")
+        no_telp = st.text_input("No. Telp", placeholder="Example: 08xxxxxxxxxx")
+        token = st.text_input("Password / Token", type="password", placeholder="Enter token")
+        submitted = st.form_submit_button("Login")
 
     if submitted:
         ok, phone_norm = normalize_id_phone(no_telp)
@@ -906,7 +906,7 @@ def page_sales():
         batch = st.number_input("Batch Size", 1, 256, 32)
     with colC:
         lr = st.number_input("Learning Rate", value=0.001, format="%.6f")
-        n_future = st.number_input("Prediksi N hari", 1, 30, 7)
+        n_future = st.number_input("Prediction N Day", 1, 30, 7)
 
     topN = 14
     top_products = (df_sales.groupby("nama produk")["jumlah terjual"].sum().astype(int)
@@ -948,8 +948,8 @@ def page_sales():
         st.pyplot(fig_pred)
 
         st.subheader("Future Prediction (cup integer)")
-        out_df = pd.DataFrame({"Hari":[f"+{i+1}" for i in range(len(preds_int))],
-                               "Prediksi (cup)": preds_int})
+        out_df = pd.DataFrame({"Day":[f"+{i+1}" for i in range(len(preds_int))],
+                               "Prediction (cup)": preds_int})
         out_df.index= np.arange(1, len(out_df) + 1)  # index mulai dari 1
         st.dataframe(out_df, width="stretch")
         st.line_chart(out_df.set_index("Day")["Prediction (cup)"])
@@ -970,7 +970,7 @@ def page_material():
         product = st.session_state.last_product
         demand_units = int(np.ceil(np.mean(st.session_state.last_future_int)))
     else:
-        product = st.text_input("Nama produk", value=DEFAULT_PRODUCT)
+        product = st.text_input("Product Name", value=DEFAULT_PRODUCT)
         demand_units = int(st.number_input("Demand (cup) integer", min_value=0, value=50))
 
     st.write("Demand use:", demand_units, "cup")
@@ -984,7 +984,7 @@ def page_material():
         ub_mult = st.number_input("Upper Bound Multiplier", value=2.0)
 
     if st.button("Run Material + GWO"):
-        with st.spinner("Menghitung kebutuhan bahan & menjalankan GWO..."):
+        with st.spinner("Calculating material requirements and running GWO..."):
             product_demand = {product: demand_units}
             ingredient_needs = compute_ingredient_needs(df_recipe_long, product_demand)
             stock_comparison = compare_with_stock(ingredient_needs, df_stock)
@@ -1074,7 +1074,7 @@ def page_material():
         st.dataframe(view2, hide_index=True, width="stretch")
 
 
-        st.subheader("Total biaya pembelian")
+        st.subheader("Total cost")
         st.write(f"Rp {solution['total_biaya_pembelian'].sum():,.0f}".replace(",", "."))
 
 def page_recipe():
