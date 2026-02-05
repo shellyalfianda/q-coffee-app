@@ -12,6 +12,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
+from scipy.optimize import linprog
 
 try:
     from streamlit_option_menu import option_menu
@@ -618,6 +619,77 @@ def objective_purchase_cost(order_vector, data: pd.DataFrame, penalty_shortage: 
     penalty = penalty_shortage * np.sum(shortage) + penalty_overstock * np.sum(overstock)
     return float(purchase_cost + penalty)
 
+def solve_lp_relaxation(data: pd.DataFrame, penalty_shortage: float, penalty_overstock: float, ub=None):
+    """
+    LP continuous:
+    min sum(c_i x_i) + Ps sum(s_i) + Po sum(o_i)
+    s_i >= n_i - (b_i + x_i)
+    o_i >= (b_i + x_i) - n_i
+    x_i, s_i, o_i >= 0
+    optional: x_i <= ub_i
+    """
+    needs = data["total_kebutuhan"].values.astype(float)
+    stock = data["Total Stok Ml/Gr"].values.astype(float)
+    c = data["unit_price"].values.astype(float)
+
+    n = len(needs)
+    if ub is None:
+        ub = np.full(n, np.inf, dtype=float)
+    else:
+        ub = np.array(ub, dtype=float)
+
+    # decision vars: [x(0..n-1), s(n..2n-1), o(2n..3n-1)]
+    obj = np.concatenate([c, np.full(n, penalty_shortage), np.full(n, penalty_overstock)])
+
+    # Inequalities A_ub @ v <= b_ub
+    # 1) s_i >= needs_i - (stock_i + x_i)  =>  -x_i - s_i <= -(needs_i - stock_i)
+    # 2) o_i >= (stock_i + x_i) - needs_i  =>   x_i - o_i <=  (needs_i - stock_i)
+    A_ub = np.zeros((2 * n, 3 * n), dtype=float)
+    b_ub = np.zeros(2 * n, dtype=float)
+
+    rhs = needs - stock
+
+    for i in range(n):
+        # -x_i - s_i <= -(rhs)
+        A_ub[i, i] = -1.0
+        A_ub[i, n + i] = -1.0
+        b_ub[i] = -rhs[i]
+
+        # x_i - o_i <= rhs
+        A_ub[n + i, i] = 1.0
+        A_ub[n + i, 2 * n + i] = -1.0
+        b_ub[n + i] = rhs[i]
+
+    bounds = []
+    for i in range(n):
+        bounds.append((0.0, float(ub[i])))      # x_i
+    for _ in range(n):
+        bounds.append((0.0, None))              # s_i
+    for _ in range(n):
+        bounds.append((0.0, None))              # o_i
+
+    res = linprog(
+        c=obj,
+        A_ub=A_ub,
+        b_ub=b_ub,
+        bounds=bounds,
+        method="highs"
+    )
+
+    if not res.success:
+        raise RuntimeError(f"LP solve failed: {res.message}")
+
+    v = res.x
+    x = v[:n]
+    s = v[n:2*n]
+    o = v[2*n:3*n]
+
+    # objective value from linprog:
+    lp_obj = float(res.fun)
+
+    return x, s, o, lp_obj
+
+
 def grey_wolf_optimization(objective_func, dim, lb, ub, num_wolves=25, max_iter=100):
     lb = np.array(lb, dtype=float)
     ub = np.array(ub, dtype=float)
@@ -977,11 +1049,11 @@ def page_material():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        num_wolves = st.number_input("Number of Wolves", 5, 100, 25)
+        num_wolves = st.number_input("Number of Wolves", 5, 100, 12)
     with col2:
-        max_iter = st.number_input("Max Iter", 10, 500, 100)
+        max_iter = st.number_input("Max Iter", 10, 500, 50)
     with col3:
-        ub_mult = st.number_input("Upper Bound Multiplier", value=2.0)
+        ub_mult = st.number_input("Upper Bound Multiplier", value=1.5)
 
     if st.button("Run Material + GWO"):
         with st.spinner("Calculating material requirements and running GWO..."):
@@ -1030,6 +1102,7 @@ def page_material():
                 objective_wrapper, dim, lb, ub,
                 num_wolves=int(num_wolves),
                 max_iter=int(max_iter),
+                
             )
 
             solution = build_solution_table(df_gwo, best_order)
@@ -1072,6 +1145,79 @@ def page_material():
         view2["Total Cost"] = view2["Total Cost"].round(0)
 
         st.dataframe(view2, hide_index=True, width="stretch")
+
+        # ===== LP Optimal (Continuous Relaxation) =====
+        lp_x, lp_s, lp_o, lp_cost = solve_lp_relaxation(
+            df_gwo,
+            penalty_shortage=penalty_shortage,
+            penalty_overstock=penalty_overstock,
+            ub=ub
+        )
+
+        # Pastikan biaya LP konsisten dengan objective kamu (optional cross-check)
+        lp_cost_check = objective_purchase_cost(lp_x, df_gwo, penalty_shortage, penalty_overstock)
+
+        # Gap (GWO vs LP) untuk versi continuous
+        gap_pct = (best_cost - lp_cost) / max(lp_cost, 1e-12) * 100.0
+
+        st.subheader("Benchmark vs LP (Optimal Continuous)")
+        st.write(f"LP Optimal Objective: {lp_cost:,.12f}")
+        st.write(f"LP Objective (recheck): {lp_cost_check:,.12f}")
+        st.write(f"GWO Best Objective: {best_cost:,.12f}")
+        st.write(f"Gap (GWO - LP) / LP: {gap_pct:.12f}%")
+
+        # ===== LP Solution Table (Format mirip GWO) =====
+        lp_view = df_gwo[[
+            "NAMA BAHAN",
+            "total_kebutuhan",
+            "Total Stok Ml/Gr",
+            "Harga"
+        ]].copy()
+
+        # Tambahkan hasil LP
+        lp_view["order_mlgr"] = lp_x
+        lp_view["shortage"] = lp_s
+        lp_view["overstock"] = lp_o
+
+        # Hitung stok akhir setelah order continuous
+        lp_view["stok_akhir"] = (
+            lp_view["Total Stok Ml/Gr"]
+            + lp_view["order_mlgr"]
+            - lp_view["total_kebutuhan"]
+        )
+
+        # Hitung biaya pembelian continuous (unit_price * order)
+        lp_view["unit_price"] = df_gwo["unit_price"].values
+        lp_view["total_biaya_pembelian"] = lp_view["unit_price"] * lp_view["order_mlgr"]
+
+        # Rename kolom supaya sama seperti tabel GWO
+        lp_view = lp_view.rename(columns={
+            "NAMA BAHAN": "Material Name",
+            "total_kebutuhan": "Total Needs",
+            "Total Stok Ml/Gr": "Initial Stock",
+            "order_mlgr": "Order (LP Continuous)",
+            "stok_akhir": "Final Stock",
+            "shortage": "Shortage",
+            "overstock": "Overstock",
+            "Harga": "Price/Pack",
+            "total_biaya_pembelian": "Total Cost (LP)"
+        })
+
+        # Rapikan angka
+        for c in ["Total Needs", "Initial Stock", "Order (LP Continuous)",
+                "Final Stock", "Shortage", "Overstock"]:
+            lp_view[c] = lp_view[c].round(2)
+
+        lp_view["Total Cost (LP)"] = lp_view["Total Cost (LP)"].round(0)
+
+        # Sort berdasarkan biaya terbesar seperti tabel GWO
+        lp_view = lp_view.sort_values("Total Cost (LP)", ascending=False).head(20)
+
+        # Tampilkan
+        st.subheader("LP Optimal Solution Table (Top 20 largest costs)")
+        st.dataframe(lp_view, hide_index=True, width="stretch")
+
+
 
 
         st.subheader("Total cost")
